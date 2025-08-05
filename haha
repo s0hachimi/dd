@@ -1,0 +1,130 @@
+use macroquad::prelude::*;
+
+type Point = Vec2;
+
+#[macroquad::main("Chaikin Animation")]
+async fn main() {
+    let mut control_points: Vec<Point> = Vec::new();
+    let mut steps: Vec<Vec<Point>> = Vec::new();
+    let mut current_step = 0;
+    let mut animating = false;
+    let mut timer = 0.0;
+    let step_duration = 0.8;
+
+    loop {
+        clear_background(WHITE);
+
+        if is_mouse_button_pressed(MouseButton::Left) && !animating {
+            let (x, y) = mouse_position();
+            control_points.push(vec2(x, y));
+        }
+
+        if is_key_pressed(KeyCode::Enter) && control_points.len() >= 1 {
+            if control_points.len() == 1 {
+                animating = false;
+                steps = vec![control_points.clone()];
+            } else {
+                animating = true;
+                steps = build_chaikin_steps(&control_points, 7);
+                current_step = 0;
+                timer = 0.0;
+            }
+        }
+
+        if is_key_pressed(KeyCode::Escape) {
+            break;
+        }
+
+        if is_key_pressed(KeyCode::C) && !animating {
+            control_points.clear();
+            steps.clear();
+        }
+
+        if animating && steps.len() > 0 {
+            timer += get_frame_time();
+            if timer >= step_duration {
+                timer = 0.0;
+                current_step += 1;
+                if current_step >= steps.len() {
+                    current_step = 0;
+                }
+            }
+        }
+
+        if animating {
+            draw_polyline(&steps[current_step], DARKBLUE);
+        } else {
+            if control_points.len() == 1 {
+                draw_circle(control_points[0].x, control_points[0].y, 5.0, RED);
+            } else if control_points.len() == 2 {
+                draw_line(
+                    control_points[0].x,
+                    control_points[0].y,
+                    control_points[1].x,
+                    control_points[1].y,
+                    2.0,
+                    BLACK,
+                );
+            } else {
+                draw_polyline(&control_points, GRAY);
+            }
+
+            for p in &control_points {
+                draw_circle(p.x, p.y, 5.0, RED);
+            }
+        }
+
+        draw_text(
+            "Click: add points | Enter: animate | C: clear | Esc: exit",
+            10.0,
+            20.0,
+            20.0,
+            DARKGRAY,
+        );
+
+        next_frame().await;
+    }
+}
+
+fn chaikin(points: &[Point]) -> Vec<Point> {
+    let mut new_points = Vec::new();
+
+    for i in 0..points.len() - 1 {
+        let p0 = points[i];
+        let p1 = points[i + 1];
+
+        let q = p0.lerp(p1, 0.25);
+        let r = p0.lerp(p1, 0.75);
+
+        new_points.push(q);
+        new_points.push(r);
+    }
+
+    new_points
+}
+
+fn build_chaikin_steps(control_points: &[Point], steps: usize) -> Vec<Vec<Point>> {
+    let mut results = Vec::new();
+    let mut current = control_points.to_vec();
+    results.push(current.clone());
+
+    for _ in 0..steps {
+        current = chaikin(&current);
+        results.push(current.clone());
+    }
+
+    results
+}
+
+fn draw_polyline(points: &[Point], color: Color) {
+    for i in 0..points.len()  {
+        draw_line(
+            points[i].x,
+            points[i].y,
+            points[i + 1].x,
+            points[i + 1].y,
+            2.0,
+            color,
+        );
+    }
+}
